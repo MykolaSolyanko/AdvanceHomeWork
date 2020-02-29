@@ -50,15 +50,12 @@ public:
   Stack(const Stack &rhs) : Vector<T>(rhs){};
   Stack(Stack &&rhs) : Vector<T>(rhs){};
   ~Stack() { Vector<T>::~Vector(); };
-  Stack &operator=(const Stack &rhs) { Vector<T>::operator=(rhs); };
-  Stack &operator=(Stack &&rhs) { Vector<T>::operator=(rhs); };
+  Stack &operator=(const Stack &rhs) { Vector<T>::operator=(rhs); return *this; };
+  Stack &operator=(Stack &&rhs) { Vector<T>::operator=(rhs); return *this; };
 
   void push(T value) { Vector<T>::push_back(value); };
-  void top() {
-    std::cout << Vector<T>::back();
-    ;
-  };
-  void pop() { Vector<T>::pop_back(); };
+  void top() { Vector<T>::back();};
+  void pop() { Vector<T>::pop_back();};
 
 private:
 };
@@ -171,7 +168,7 @@ void Vector<T>::push_front(const T &value) {
   if (data_ == nullptr) {
     return;
   }
-  data_[0] = value;
+  insert(0, value);
 }
 
 template <class T>
@@ -196,14 +193,13 @@ T *Vector<T>::insert(const size_t pos, const T value) {
   if (size_ == capacity_) {
     capacity_ *= delta;
   }
-  ++size_;
-  for (size_t i = size_; i > pos; --i) {
-    if (i >= pos) {
-      std::swap(data_[i - 1], data_[i]);
-    }
-  }
-  data_[pos] = value;
-  return data_;
+  size_t pos_coun = pos;
+	for (size_t i = size_; i > pos_coun; --i) {
+		data_[i] = data_[i - 1];
+	}
+	data_[pos_coun] = value;
+	++size_;
+	return data_;
 }
 
 template <class T>
