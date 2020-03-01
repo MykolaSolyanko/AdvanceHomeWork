@@ -1,215 +1,250 @@
 #pragma once
 
 #include <cstddef>
+#include <cstring>
 #include <initializer_list>
+#include <type_traits>
+#include <utility>
 
 template <typename T> class Vector {
 public:
-  // Constructor 1
-  Vector(size_t size) : size_{size}, capacity_{size} {
-    if (size) {
-      data_ = new T[capacity_]{};
+  // Default Constructor
+  Vector() = default;
+
+  // User-Defined Constructor 1
+  Vector(const size_t SIZE) {
+    if (SIZE > 0) {
+      T *tmp = new T[SIZE]{};
+      update_parameters(tmp, SIZE, SIZE);
     }
   }
 
-  // Constructor 2
+  // User-Defined Constructor 2
   Vector(std::initializer_list<T> list) {
-    const size_t COUNT{list.size()};
-    if (COUNT) {
-      size_ = capacity_ = COUNT;
-      alloc(list.begin(), list.end());
-    }
+    alloc(list.begin(), list.end(), list.size());
   }
 
-  // Constructor 3
-  Vector(T *begin, T *end) {
-    if (begin == nullptr || end == nullptr || begin >= end) {
-      return;
-    }
-    size_ = capacity_ = end - begin;
-    alloc(begin, end);
-  }
+  // User-Defined Constructor 3
+  Vector(const T *begin, const T *const end) { alloc(begin, end, end - begin); }
 
   // Copy Constructor
-  Vector(const Vector &rhs) : size_{rhs.size_}, capacity_{rhs.capacity_} {
-    if (rhs.data_ == nullptr) {
-      return;
-    }
-    alloc(rhs.data_, rhs.data_ + size_);
+  Vector(const Vector &rhs) {
+    alloc(rhs.data_, rhs.data_ + rhs.size_, rhs.capacity_);
   }
 
-  // Destructor
-  ~Vector() { delete[] data_; }
+  // Move Constructor
+  Vector(Vector &&rhs) noexcept
+      : data_{rhs.data_}, size_{rhs.size_}, capacity_{rhs.capacity_} {
+    rhs.update_parameters(nullptr, 0, 0);
+  }
 
   // Copy Assignment
   Vector &operator=(const Vector &rhs) {
     if (this == &rhs) {
       return *this;
     }
-    size_ = rhs.size_;
-    capacity_ = rhs.capacity_;
-    delete[] data_;
-    if (rhs.data_ == nullptr) {
-      data_ = nullptr;
+    if (rhs.empty()) {
+      clear();
       return *this;
     }
-    alloc(rhs.data_, rhs.data_ + size_);
+    realloc(rhs.data_, rhs.data_ + rhs.size_, rhs.capacity_);
     return *this;
   }
 
-  void push_back(T value) { add(value); }
-
-  void push_front(T value) {
-    if (data_ == nullptr) {
-      data_ = new T{value};
-      capacity_ = size_ = 1;
-      return;
-    }
-    if (size_ == capacity_) {
-      reserve(capacity_ * 2);
-    }
-    // Shift values
-    T *new_data = new T[capacity_];
-    copy(new_data + 1, data_, data_ + size_);
+  // Move Assignment
+  Vector &operator=(Vector &&rhs) noexcept {
     delete[] data_;
-    data_ = new_data;
+    update_parameters(rhs.data_, rhs.size_, rhs.capacity_);
+    rhs.update_parameters(nullptr, 0, 0);
+    return *this;
+  }
+
+  // Destructor
+  ~Vector() noexcept { delete[] data_; }
+
+  void push_front(const T &value) {
+    shift(0);
     *data_ = value;
-    ++size_;
   }
 
-  // IN PROGRESS
-  // этот метод являеться опциональным
-  /*template <typename T1>
-  void emplace_back(T1 value)*/
-
-  T *insert(T value) {
-    add(value);
-    return data_ + size_ - 1;
+  void push_front(T &&value) {
+    shift(0);
+    *data_ = std::move(value);
   }
 
-  T *erase(size_t pos) {
-    // CASE 1: Invalid input or Empty vector
-    if (pos >= size_) {
+  void push_back(const T &value) {
+    increase_capacity_if_full();
+    *(data_ + size_++) = value;
+  }
+
+  void push_back(T &&value) {
+    increase_capacity_if_full();
+    *(data_ + size_++) = std::move(value);
+  }
+
+  template <typename... Args> void emplace_back(const Args &... args) {
+    increase_capacity_if_full();
+    new (data_ + size_++) T{args...};
+  }
+
+  // PROBLEM
+  template <typename ...Args> void emplace_back(Args&&... args) {
+    increase_capacity_if_full();
+    new (data_ + size_++) T{std::move(args...)};
+  }
+
+  T *insert(const T &value, size_t pos) {
+    if (pos > size_) {
       return nullptr;
     }
-    // CASE 2: Delete whole vector
-    if (size_ == 1) {
-      clear();
-      return data_;
-    }
-    // CASE 3: Shift vector and decrease size
-    T *element{data_ + pos};
-    copy(element, element + 1, data_ + size_--);
-    return element;
+    shift(pos);
+    *(data_ + pos) = value;
+    return data_ + pos;
   }
 
-  // IN PROGRESS
-  // call to erase(0) ->  error: call of overloaded ‘erase(int)’ is ambiguous
-  // T *erase(int *pos);
+  T *insert(T &&value, size_t pos) {
+    if (pos > size_) {
+      return nullptr;
+    }
+    shift(pos);
+    *(data_ + pos) = std::move(value);
+    return data_ + pos;
+  }
+
+  T *erase(T *pos) { return erase(pos, pos + 1); }
+
+  T *erase(size_t pos) { return erase(data_ + pos, data_ + pos + 1); }
 
   T *erase(T *begin, T *end) {
-    // CASE 1: Invalid input or Empty vector
     if (begin < data_ || begin >= data_ + size_) {
       return nullptr;
     }
     if (end <= begin || end > data_ + size_) {
       return nullptr;
     }
-    // CASE 2: Delete whole vector
-    const size_t ERASE_COUNT = end - begin;
-    if (size_ == ERASE_COUNT) {
-      clear();
-      return data_;
-    }
-    // CASE 3: Shift vector and decrease size
-    T *new_data = new T[size_ - ERASE_COUNT];
-    copy(new_data, data_, begin);
-    const ptrdiff_t CURRENT_POS{begin - data_};
-    copy(new_data + CURRENT_POS, end, data_ + size_);
-    delete[] data_;
-    data_ = new_data;
-    size_ -= ERASE_COUNT;
-    return data_;
-  }
-
-  void resize(size_t count) {
-    if (count == size_) {
-      return;
-    }
-    if (count == 0) {
-      clear();
-      return;
-    }
-    if (count > size_) {
-      if (count > capacity_) {
-        reserve(count);
-      }
-      T *begin = data_ + size_;
-      const T *const end = data_ + count;
-      while (begin != end) {
-        *begin++ = T{};
-      }
-    }
-    size_ = count;
-    return;
+    const ptrdiff_t ERASE_COUNT{end - begin}, ERASE_START_INDEX{begin - data_};
+    custom_copy(begin, end, ERASE_START_INDEX, size_ - ERASE_COUNT, capacity_);
+    return data_ + ERASE_START_INDEX;
   }
 
   void reserve(size_t new_cap) {
-    if (new_cap <= capacity_) {
+    if (new_cap > capacity_) {
+      realloc(data_, data_ + size_, new_cap);
+    }
+  }
+
+  void resize(size_t new_size) {
+    if (new_size == size_) {
       return;
     }
-    capacity_ = new_cap;
-    T *new_data = new T[capacity_]{};
-    copy(new_data, data_, data_ + size_);
-    delete[] data_;
-    data_ = new_data;
+    if (new_size > size_) {
+      size_t new_capacity = (new_size > capacity_ ? new_size : capacity_);
+      T *tmp = new T[new_capacity];
+      copy(tmp, data_, data_ + size_);
+      initialize(tmp + size_, tmp + new_size);
+      delete[] data_;
+      update_parameters(tmp, new_size, new_capacity);
+    } else {
+      realloc(data_, data_ + new_size, capacity_);
+    }
   }
 
-  T *begin() const { return data_; }
-  T *end() const { return data_ + size_; }
-  T back() const { return *(data_ + size_ - 1); }
+  void clear() noexcept {
+    delete[] data_;
+    update_parameters(nullptr, 0, 0);
+  }
+
+  T *begin() noexcept { return data_; }
+  T *const end() noexcept { return data_ + size_; }
   T front() const { return *data_; }
-  size_t size() const { return size_; }
-  size_t capacity() const { return capacity_; }
-  bool empty() const { return !size_; }
-  T &operator[](size_t pos) { return data_[pos]; }
-  const T &operator[](size_t pos) const { return data_[pos]; }
+  T back() const { return *(data_ + size_ - 1); }
+  T &operator[](size_t pos) { return *(data_ + pos); }
+  const T &operator[](size_t pos) const { return *(data_ + pos); }
+  size_t size() const noexcept { return size_; }
+  size_t capacity() const noexcept { return capacity_; }
+  size_t empty() const noexcept { return data_ == nullptr; }
 
 private:
-  T *data_{};
-  size_t size_{};
-  size_t capacity_{};
-
-  // Copies values from source sequence to destination
+  // Copy values from source sequence into destination
   void copy(T *dst, const T *src_begin, const T *const src_end) {
-    while (src_begin != src_end) {
-      *dst++ = *src_begin++;
+    // Exceptions
+    if (dst == nullptr || src_begin == nullptr || src_begin >= src_end) {
+      return;
+    }
+    // Option 1: Copy with memcpy for POD types
+    if (std::is_trivially_copyable<T>::value) {
+      const ptrdiff_t LENGTH{src_end - src_begin};
+      memcpy(dst, src_begin, sizeof(T) * LENGTH);
+    }
+    // Option 2: Copy with assignment operator for classes
+    else {
+      while (src_begin != src_end) {
+        *dst++ = *src_begin++;
+      }
     }
   }
 
-  // Deletes vector data. Sets size_ and capacity_ to 0.
-  void clear() {
-    size_ = capacity_ = 0;
-    delete[] data_;
-    data_ = nullptr;
+  // Updates DATA_, SIZE_, and CAPACITY_ to new values
+  void update_parameters(T *new_data, size_t new_size, size_t new_capacity) noexcept {
+    data_ = new_data;
+    size_ = new_size;
+    capacity_ = new_capacity;
   }
 
-  // Allocates memory for data_ by capacity_, then copies values
-  void alloc(const T *begin, const T *const end) {
-    data_ = new T[capacity_];
-    copy(data_, begin, end);
-  }
-
-  // Add element to the end of vector
-  void add(T &value) {
-    if (data_ == nullptr) {
-      data_ = new T{value};
-      capacity_ = size_ = 1;
-    } else {
-      if (size_ == capacity_) {
+  // To be used when vector is full
+  void increase_capacity_if_full() {
+    if (size_ == capacity_) {
+      if (capacity_ == 0) {
+        reserve(1);
+      } else {
         reserve(capacity_ * 2);
       }
-      *(data_ + size_++) = value;
     }
   }
+
+  // Initialize already allocated memory
+  void initialize(T *begin, const T *const end) {
+    while (begin != end) {
+      new (begin++) T{};
+    }
+  }
+
+  // Create vector from input data
+  void alloc(const T *begin, const T *const end, const size_t CAPACITY) {
+    if (begin != nullptr && end > begin) {
+      T *tmp = new T[CAPACITY];
+      copy(tmp, begin, end);
+      update_parameters(tmp, end - begin, CAPACITY);
+    }
+  }
+
+  // Update vector with new data with optional shift in data
+  void realloc(T *begin, T *end, size_t CAPACITY) {
+    T *tmp = new T[CAPACITY];
+    copy(tmp, begin, end);
+    delete[] data_;
+    update_parameters(tmp, (end - begin), CAPACITY);
+  }
+
+  // Shift values after index to right
+  void shift(size_t index) {
+    size_t new_capacity{capacity_};
+    if (size_ == capacity_) {
+      new_capacity = (capacity_ == 0 ? 1 : capacity_ * 2);
+    }
+    custom_copy(data_ + index, data_ + index, index + 1, size_ + 1, new_capacity);
+  }
+
+  // Copy part of vector
+  void custom_copy(T *SKIP_START, T *SKIP_STOP, size_t CONTINUE_INDEX, size_t NEW_SIZE, size_t NEW_CAPACITY) {
+    T *tmp = new T[NEW_CAPACITY];
+    copy(tmp, data_, SKIP_START);
+    copy(tmp + CONTINUE_INDEX, SKIP_STOP, data_ + size_);
+    delete[] data_;
+    update_parameters(tmp, NEW_SIZE, NEW_CAPACITY);
+  }
+
+  T *data_{nullptr};
+  size_t size_{0};
+  size_t capacity_{0};
 };
