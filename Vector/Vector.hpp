@@ -262,7 +262,10 @@ void Vector<T>::resize(const size_t count) {
       data_[i] = T();
     }
   } else if (size_ > count) {
-    size_ = count;
+    for (int i = count;size_>i; --i) {
+      data_[i].~T();
+		}
+		size_ = count;
   }
   return ;
 }
