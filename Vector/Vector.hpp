@@ -1,9 +1,7 @@
-enum { delta = 2 };
-
 template <class T>
 class Vector {
 public:
-  Vector() = delete;
+  Vector() = default;
   Vector(const size_t size);
   Vector(std::initializer_list<T> args);
   Vector(const T *begin, const T *const end);
@@ -13,8 +11,8 @@ public:
   Vector &operator=(const Vector &rhs);
   Vector &operator=(Vector &&rhs);
 
-  T *begin() const;
-  T *end() const;
+  const T *begin() const;
+  const T *end() const;
   void push_back(const T &value);
   void push_back(T &&value);
   void push_front(const T &value);
@@ -48,10 +46,10 @@ public:
   Stack() = default;
   Stack(const size_t size) : Vector<T>(size){};
   Stack(const Stack &rhs) : Vector<T>(rhs){};
-  Stack(Stack &&rhs) : Vector<T>(rhs){};
+  Stack(Stack &&rhs) : Vector<T>(std::move(rhs)){};
   ~Stack() { Vector<T>::~Vector(); };
   Stack &operator=(const Stack &rhs) { Vector<T>::operator=(rhs); return *this; };
-  Stack &operator=(Stack &&rhs) { Vector<T>::operator=(rhs); return *this; };
+  Stack &operator=(Stack &&rhs) { Vector<T>::operator=(std::move(rhs)); return *this; };
 
   void push(T value) { Vector<T>::push_back(value); };
   void top() { Vector<T>::back();};
@@ -70,23 +68,17 @@ Vector<T>::Vector(const Vector &rhs)
 
 template <class T>
 Vector<T>::Vector(std::initializer_list<T> args)
-    : capacity_{args.size() * delta} {
-  data_ = new T[args.size()];
-  size_ = 0;
-  for (T x : args) {
-    data_[size_++] = x;
+    : data_(new T[args.size()]), size_(0), capacity_{ args.size() * 2 } {
+   for (T x : args) {
+    data_[size_++] = std::move(x);
   }
 }
 
-template <class T> Vector<T>::Vector(const T *begin, const T *const end) {
-  if (begin == nullptr || end == nullptr || begin == end) {
-    return;
-  }
-  size_ = std::distance(begin, end);
-  capacity_ = size_ * delta;
-  data_ = new int[size_];
-  for (size_t i = 0; i < size_; ++i) {
-    data_[i] = *begin++;
+template <class T> Vector<T>::Vector(const T *begin, const T *const end)
+  : data_(new T[size_]), size_(std::distance(begin, end)), capacity_(size_ * 2){
+  T* copy_data_ = data_;
+  while (begin != end) {
+    *copy_data_++ = *begin++;
   }
 }
 
@@ -100,9 +92,6 @@ Vector<T>::Vector(Vector &&rhs)
 
 template <class T>
 Vector<T>::~Vector() {
-  if (data_ == nullptr) {
-    return;
-  }
   delete[] data_;
 }
 
@@ -111,13 +100,14 @@ Vector<T> &Vector<T>::operator=(const Vector &arg) {
   if (this == &arg) {
     return *this;
   }
-  delete[] data_;
+  T* tmp_data_ = new T[size_]{};
   size_ = arg.size_;
   capacity_ = arg.capacity_;
-  data_ = new T[size_];
-  for (size_t i = 0; i < size_; ++i) {
-    data_[i] = arg.data_[i];
+  for (size_t i = 0; i < arg.size(); ++i) {
+    tmp_data_[i] = arg.data_[i];
   }
+  delete[] data_;
+  data_ = tmp_data_;
   return *this;
 }
 template <class T>
@@ -132,49 +122,44 @@ Vector<T> &Vector<T>::operator=(Vector &&rhs) {
 }
 
 template <class T>
-T *Vector<T>::begin() const {
-  if (data_ == nullptr) {
-    return 0;
-  }
-  return data_;
+const T *Vector<T>::begin() const {
+  return data_ == nullptr ? data_ : data_ + size_;;
 }
 
 template <class T>
-T *Vector<T>::end() const {
+const T *Vector<T>::end() const {
   if (data_ == nullptr) {
-    return 0;
+    return nullptr;
   }
   return data_ + size_;
 }
 
 template <class T>
 void Vector<T>::push_back(const T &value) {
-  if (size_ == capacity_) {
-    capacity_ *= delta;
-  }
+  if (size_ == capacity_) {reserve(size_ == 0 ? 1 : size_ * 2);}
+  if (data_ == nullptr) { data_ = new T[size_]; };	
   data_[size_++] = value;
 }
 
 template <class T>
 void Vector<T>::push_back(T &&value) {
-  if (size_ == capacity_) {
-    capacity_ *= delta;
-  }
+  if (size_ == capacity_) {reserve(size_ == 0 ? 1 : size_ * 2);}
+  if (data_ == nullptr) { data_ = new T[size_]; };
   data_[size_++] = std::move(value);
 }
 
 template <class T>
 void Vector<T>::push_front(const T &value) {
-  if (data_ == nullptr) {
-    return;
-  }
+  if (data_ == nullptr) {reserve(size_ == 0 ? 1 : size_ * 2);;}
+  if (size_ == capacity_ ) { reserve(size_ == 0 ? 1 : size_ * 2); }
   insert(0, value);
 }
 
 template <class T>
 void Vector<T>::pop_back() {
-  if (data_ == nullptr) {
-    return;
+  if (data_ == nullptr) {return;}
+  if constexpr (std::is_destructible<T>::value) {
+    data_[size_-1].~T();
   }
   --size_;
 }
@@ -182,32 +167,35 @@ void Vector<T>::pop_back() {
 template <class T>
 template <class... Arg>
 void Vector<T>::emplace_back(Arg &&... args) {
+  if (size_ == capacity_ ) { reserve(size_ == 0 ? 1 : size_ * 2);}
   new (&data_[size_++]) T{std::forward<Arg...>(args...)};
 }
 
 template <class T>
 T *Vector<T>::insert(const size_t pos, const T value) {
   if (size_ < pos) {
-    return 0;
+    return nullptr;
   }
-  if (size_ == capacity_) {
-    capacity_ *= delta;
-  }
+ if (size_ == capacity_ ) { reserve(size_ == 0 ? 1 : size_ * 2);}
   size_t pos_coun = pos;
-	for (size_t i = size_; i > pos_coun; --i) {
-		data_[i] = data_[i - 1];
-	}
-	data_[pos_coun] = value;
-	++size_;
-	return data_;
+    for (size_t i = size_; i > pos_coun; --i) {
+      data_[i] = data_[i - 1];
+    }
+    data_[pos_coun] = value;
+    ++size_;
+    return data_;
 }
 
 template <class T>
 T *Vector<T>::erase(const size_t pos) {
   if (size_ < pos&&pos<=0) {
-    return 0;
+    return nullptr;
   }
-  for (int i = pos; i < size_; ++i) {
+  size_t i = pos;
+  if constexpr (std::is_destructible<T>::value) {
+    data_[i].~T();
+  }
+  for (; i < size_; ++i) {
     data_[i - 1] = data_[i];
   }
   --size_;
@@ -216,12 +204,14 @@ T *Vector<T>::erase(const size_t pos) {
 
 template <class T>
 T *Vector<T>::erase(const int *pos) {
-  if (pos == nullptr) {
-    return 0;
-  }
-  for (size_t i = 0; i < size_; ++i) {
-    if (data_[i] == *pos) {
-      data_[i] = data_[i + 1];
+  if (pos == nullptr) {return nullptr;}
+    for (size_t i = 0; i < size_; ++i) {
+      if (data_[i] == pos) {
+        if constexpr (std::is_destructible<T>::value) {
+          data_[i].~T();
+        }
+        data_[i] = data_[i + 1];
+      }
     }
   }
   --size_;
@@ -231,14 +221,22 @@ T *Vector<T>::erase(const int *pos) {
 template <class T>
 T *Vector<T>::erase(const T *begin, const T *const end) {
   if (begin == nullptr || end == nullptr || begin == end) {
-    return 0;
+    return nullptr;
   }
   T *end_erase = end;
   const T *const new_end = begin + std::distance(begin, end);
-  while (begin != new_end) {
-    *begin++ = *end_erase++;
-    --size_;
-  }
+ while (begin != new_end) {
+    if constexpr (std::is_destructible<T>::value) {
+      for (begin; end; ++begin) {
+        begin->~T();
+        *begin++ = *end_erase++;
+        --size_;
+      }
+    }
+    else {
+      *begin++ = *end_erase++;
+      --size_;
+    }
   return begin;
 }
 
@@ -261,25 +259,26 @@ void Vector<T>::resize(const size_t count) {
   if (size_ < count) {
     size_ = count;
     for (int i = size_; i < count; ++i) {
-      data_[i] = 0;
+      data_[i] = T();
     }
   } else if (size_ > count) {
     size_ = count;
   }
+  return ;
 }
 
 template <class T>
 void Vector<T>::reserve(const size_t new_cap) {
-  T *newData_ = new T[new_cap];
-  for (size_t i = 0; i < size_; ++i) {
-    newData_[i] = data_[i];
+  if (new_cap > capacity_) {
+    T* tmp_data_ = new T[new_cap];
+    for (size_t i = 0; i != size_; ++i) {
+      tmp_data_[i] = data_[i];
+    }
+    delete[] data_;
+    data_ = tmp_data_;
+    capacity_ = new_cap;
   }
-  if (size_ > new_cap) {
-    size_ = new_cap;
-  }
-  capacity_ = new_cap;
-  delete[] data_;
-  data_ = newData_;
+  return;
 }
 
 template <class T>
@@ -290,5 +289,5 @@ size_t Vector<T>::capacity() const { return capacity_; }
 
 template <class T>
 bool Vector<T>::empty() const {
-  return size_ == 0 ? false : true;
+  return size_ == 0;
 }
