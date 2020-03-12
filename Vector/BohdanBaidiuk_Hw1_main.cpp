@@ -2,16 +2,37 @@
 #include <iostream>
 
 int main() {
-  Stack<int>stack(5);
-  Stack<int>stack1(stack);
-  Stack<int>stack2 = stack1;
-  stack = stack2;
+  Vector<int>v;
+	v.insert(5, 3);
+	v.push_back(3);
+	v.reserve(10);
+	v.resize(6);
+	v.pop_back();
+	Vector<int>v1(v);
+	Vector<A>vA(4);
+	v.emplace_back(1);
+	v.push_front(9);
+	Vector<A>vA1(vA);
+	vA1.pop_back();
+	vA1.push_front(55);
+	vA1.erase(66);
+	vA = vA1;
+	vA1 = Vector<A>(8);
 
-  stack.push(5);
-  stack.push(6);
-  stack.pop();
-  stack.push(7);
-  stack.top();
+	Stack<char>st;
+	st.push('r');
+	st.pop();
+	st.push('R');
+	st.push('Y');
+	st.top();
+	Stack<char>st1 = st;
+
+	Stack<A>stA(99);
+	stA.push(4);
+	stA.push(6578);
+	stA.push(55);
+	stA.pop();
+	stA.top();
 
   return 0;
 };
