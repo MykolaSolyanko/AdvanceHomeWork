@@ -1,6 +1,22 @@
 #include "Vector.h"
 #include <iostream>
 
+class A {
+public:
+  A() = default;
+  A(int size) :a(size) { }
+  A(int size, double d) :a(size),y(d){}
+  A(const A&) {}
+  A(A&&) {}
+  A operator =(const A&) {return *this; }
+  A operator =(A&&) {return *this; }
+private:
+  int a;
+  double y;
+};
+
+
+
 int main() {
   Vector<int>v;
 	v.insert(5, 3);
