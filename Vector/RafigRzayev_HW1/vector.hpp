@@ -5,6 +5,7 @@
 #include <initializer_list>
 #include <type_traits>
 #include <utility>
+#include <iterator>
 
 template <typename T> class Vector {
 public:
@@ -25,7 +26,7 @@ public:
   }
 
   // User-Defined Constructor 3
-  Vector(const T *begin, const T *const end) { alloc(begin, end, end - begin); }
+  Vector(const T *begin, const T *const end) { alloc(begin, end, std::distance(begin, end)); }
 
   // Copy Constructor
   Vector(const Vector &rhs) {
@@ -122,7 +123,8 @@ public:
     if (end <= begin || end > data_ + size_) {
       return nullptr;
     }
-    const ptrdiff_t ERASE_COUNT{end - begin}, ERASE_START_INDEX{begin - data_};
+    const auto ERASE_COUNT{std::distance(begin, end)};
+    const auto ERASE_START_INDEX{std::distance(data_, begin)};
     custom_copy(begin, end, ERASE_START_INDEX, size_ - ERASE_COUNT, capacity_);
     return data_ + ERASE_START_INDEX;
   }
@@ -167,13 +169,13 @@ public:
 private:
   // Copy values from source sequence into destination
   void copy(T *dst, const T *src_begin, const T *const src_end) {
+    const auto LENGTH{std::distance(src_begin, src_end)};
     // Exceptions
-    if (dst == nullptr || src_begin == nullptr || src_begin >= src_end) {
+    if (dst == nullptr || src_begin == nullptr || LENGTH <= 0) {
       return;
     }
     // Option 1: Copy with memcpy for POD types
     if (std::is_trivially_copyable<T>::value) {
-      const ptrdiff_t LENGTH{src_end - src_begin};
       memcpy(dst, src_begin, sizeof(T) * LENGTH);
     }
     // Option 2: Copy with assignment operator for classes
@@ -211,10 +213,11 @@ private:
 
   // Create vector from input data
   void alloc(const T *begin, const T *const end, const size_t CAPACITY) {
-    if (begin != nullptr && end > begin) {
+    const auto LENGTH{std::distance(begin, end)};
+    if (begin != nullptr && LENGTH > 0) {
       T *tmp = new T[CAPACITY];
       copy(tmp, begin, end);
-      update_parameters(tmp, end - begin, CAPACITY);
+      update_parameters(tmp, LENGTH, CAPACITY);
     }
   }
 
@@ -223,7 +226,7 @@ private:
     T *tmp = new T[CAPACITY];
     copy(tmp, begin, end);
     delete[] data_;
-    update_parameters(tmp, (end - begin), CAPACITY);
+    update_parameters(tmp, std::distance(begin, end), CAPACITY);
   }
 
   // Shift values after index to right
