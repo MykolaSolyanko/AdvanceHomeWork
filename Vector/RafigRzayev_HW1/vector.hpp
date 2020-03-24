@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstddef>
 #include <cstring>
 #include <initializer_list>
 #include <type_traits>
@@ -86,7 +85,7 @@ public:
       return nullptr;
     }
     shift(pos);
-    *(data_ + pos) = std::forward(value);
+    *(data_ + pos) = std::forward<T3>(value);
     return data_ + pos;
   }
 
@@ -153,7 +152,7 @@ private:
       return;
     }
     // Option 1: Copy with memcpy for POD types
-    if (std::is_trivially_copyable<T>::value) {
+    if constexpr(std::is_trivially_copyable<T>::value) {
       memcpy(dst, src_begin, sizeof(T) * LENGTH);
     }
     // Option 2: Copy with assignment operator for classes
@@ -183,9 +182,16 @@ private:
   }
 
   // Initialize already allocated memory
-  void initialize(T *begin, const T *const end) {
-    while (begin != end) {
-      new (begin++) T{};
+  void initialize(T *begin, T* end) {
+    // Option 1: Initialize with memset for POD types
+    if constexpr(std::is_trivial<T>::value) {
+      memset(begin, 0, sizeof(T) * std::distance(begin, end));
+    }
+    // Option 2: Initialize with default constructor
+    else {
+      while (begin != end) {
+        new (begin++) T{};
+      }
     }
   }
 

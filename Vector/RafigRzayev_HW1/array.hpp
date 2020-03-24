@@ -47,7 +47,7 @@ Array& operator=(Array&&rhs) noexcept {
     delete [] data_;
     std::cout << "Array Destructor\n";
 }
-void print(const char* c) {
+void print(const char* c) const {
     std::cout << c << " -> ";
     if(size_ == 0) {
         std::cout << "Empty\n";

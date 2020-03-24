@@ -1,13 +1,18 @@
 #include "vector.hpp"
 #include "array.hpp"
 #include <iostream>
-#include <string>
 
-void show_vector(Vector<Array>&vec) {
-    std::cout << "SIZE: " << vec.size() << "  CAPACITY: " << vec.capacity() << "\nDATA: \n";
+void show_vector(const Vector<Array>&vec) {
+    std::cout << "\nSIZE: " << vec.size() << "  CAPACITY: " << vec.capacity() << "\nDATA: ";
+    if(vec.size() == 0) {
+        std::cout << "NO ELEMENTS\n";
+        return;
+    }
+    std::cout << "\n";
     for(size_t i{0}; i < vec.size(); ++i) {
         vec[i].print(" ");
     }
+    std::cout << "\n";
 }
 
 void line(const char* s) {
@@ -60,74 +65,140 @@ int main() {
 
     line("DEFAULT CTOR");
     Vector<Array> v0;
+    show_vector(v0);
 
     line("CTOR 1 - SIZE");    
     Vector<Array> v1(3);
+    show_vector(v1);
 
     line("CTOR 2 - INITIALIZER LIST");
     Vector<Array> v2({Array(1), Array(2)});
+    show_vector(v2);
 
     line("CTOR 3 - BEGIN, END");
     const size_t SIZE{5};
     Array a[SIZE]{Array(1), Array(2), Array(4), Array(6), Array(8)};
     Vector<Array>v3(a, a + 3);
+    show_vector(v3);
 
     line("COPY CTOR");
     Vector<Array> v4(3);
     Vector<Array> v5(v4);
+    show_vector(v5);
 
     line("COPY ASSIGNMENT");
     Vector<Array> v6(1);
     Vector<Array> v7(2);
     v6 = v7;
+    show_vector(v7);
 
     line("MOVE CTOR");
     Vector<Array> v8(2);
     Vector<Array> v9(std::move(v8));
+    show_vector(v8);
+    show_vector(v9);
 
     line("MOVE ASSIGNMENT");
     Vector<Array> v10(1);
     Vector<Array> v11(2);
     v11 = std::move(v10);
+    show_vector(v10);
+    show_vector(v11);
 
     line("PUSH FRONT LVAL");
-    Array b;
+    Array b(3);
     Vector<Array> v12(2);
     v12.push_front(b);
+    show_vector(v12);
 
     line("PUSH FRONT RVAL"); 
     Vector<Array> v13(3);
     v13.push_front(Array(15));
+    show_vector(v13);
 
     line("PUSH BACK LVAL");
     Array b1(3);
     Vector<Array>v14;
     v14.reserve(3);
     v14.push_back(b1);
+    show_vector(v14);
 
     line("PUSH BACK RVAL"); 
     Array b2(3);
     Vector<Array>v15(2);
     v15.push_back(std::move(b2));    
+    show_vector(v15);
 
     line("EMPLACE BACK LVAL");
-    Array b3(100);
+    Array b3(12);
     Vector<Array>v16;
     v16.reserve(3);
     v16.emplace_back(b3);
+    show_vector(v16);
 
     line("EMPLACE BACK RVAL");
     Array b4(3);
     Vector<Array>v17;
     v17.reserve(3);
     v17.emplace_back(std::move(b4));
+    show_vector(v17);
 
     line("EMPLACE BACK - PROVIDE CTOR ARGS");
     Vector<Array>v18;
     v18.reserve(3);
     const size_t SIZE_{5};
     v18.emplace_back(SIZE_);
+    show_vector(v18);
 
-    line("END");
+    line("INSERT - LVAL");
+    Array b5(10);
+    Vector<Array>v19(4);
+    v19.insert(b5, 1);
+    show_vector(v19);
+
+    line("INSERT - RVAL");
+    Array b6(10);
+    Vector<Array>v20(3);
+    v20.insert(std::move(b5), 3);
+    show_vector(v20);
+
+    line("ERASE");
+    Vector<Array>v21({Array(1), Array(2), Array(3), Array(4), Array(5)});
+    show_vector(v21);
+    v21.erase(v21.begin(), v21.begin() + 3);
+    show_vector(v21);
+    v21.erase(1);
+    show_vector(v21);
+    v21.erase(v21.end() - 1);
+    show_vector(v21);
+
+    line("RESERVE");
+    Vector<Array>v22(2);
+    std::cout << "*****\n";
+    v22.reserve(2);
+    std::cout << "*****\n";
+    v22.reserve(3);
+    std::cout << "*****\n";
+    v22.reserve(1);
+
+    line("RESIZE - DECREASE SIZE");
+    Vector<Array>v23;
+    v23.reserve(3);
+    v23.push_back(Array(1));
+    v23.push_back(Array(2));
+    show_vector(v23);
+    v23.resize(1);
+    show_vector(v23);
+
+    line("RESIZE - INCREASE SIZE");
+    Vector<Array>v24(1);
+    show_vector(v24);
+    v24.resize(3);
+    show_vector(v24);
+    
+    line("RESIZE - SAME SIZE");
+    Vector<Array>v25(3);
+    v25.resize(3);
+    line("END");    
     return 0;
 }
