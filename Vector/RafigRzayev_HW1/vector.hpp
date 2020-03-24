@@ -63,52 +63,30 @@ public:
   // Destructor
   ~Vector() noexcept { delete[] data_; }
 
-  void push_front(const T &value) {
+  template <typename T1>
+  void push_front(T1&& value) {
     shift(0);
-    *data_ = value;
+    *data_ = std::forward<T1>(value);
   }
 
-  void push_front(T &&value) {
-    shift(0);
-    *data_ = std::move(value);
-  }
-
-  void push_back(const T &value) {
+  template <typename T2>
+  void push_back(T2&& value) {
     increase_capacity_if_full();
-    *(data_ + size_++) = value;
+    *(data_ + size_++) = std::forward<T2>(value);
   }
 
-  void push_back(T &&value) {
-    increase_capacity_if_full();
-    *(data_ + size_++) = std::move(value);
-  }
-
-  template <typename... Args> void emplace_back(const Args &... args) {
-    increase_capacity_if_full();
-    new (data_ + size_++) T{args...};
-  }
-
-  // PROBLEM
   template <typename ...Args> void emplace_back(Args&&... args) {
     increase_capacity_if_full();
-    new (data_ + size_++) T{std::move(args...)};
+    new (data_ + size_++) T{std::forward<Args...>(args...)};
   }
 
-  T *insert(const T &value, size_t pos) {
+  template<typename T3>
+  T *insert(T3&& value, size_t pos) {
     if (pos > size_) {
       return nullptr;
     }
     shift(pos);
-    *(data_ + pos) = value;
-    return data_ + pos;
-  }
-
-  T *insert(T &&value, size_t pos) {
-    if (pos > size_) {
-      return nullptr;
-    }
-    shift(pos);
-    *(data_ + pos) = std::move(value);
+    *(data_ + pos) = std::forward(value);
     return data_ + pos;
   }
 
