@@ -2,9 +2,9 @@
 
 #include <cstring>
 #include <initializer_list>
+#include <iterator>
 #include <type_traits>
 #include <utility>
-#include <iterator>
 
 template <typename T> class Vector {
 public:
@@ -25,7 +25,9 @@ public:
   }
 
   // User-Defined Constructor 3
-  Vector(const T *begin, const T *const end) { alloc(begin, end, std::distance(begin, end)); }
+  Vector(const T *begin, const T *const end) {
+    alloc(begin, end, std::distance(begin, end));
+  }
 
   // Copy Constructor
   Vector(const Vector &rhs) {
@@ -62,25 +64,22 @@ public:
   // Destructor
   ~Vector() noexcept { delete[] data_; }
 
-  template <typename T1>
-  void push_front(T1&& value) {
+  template <typename T1> void push_front(T1 &&value) {
     shift(0);
     *data_ = std::forward<T1>(value);
   }
 
-  template <typename T2>
-  void push_back(T2&& value) {
+  template <typename T2> void push_back(T2 &&value) {
     increase_capacity_if_full();
     *(data_ + size_++) = std::forward<T2>(value);
   }
 
-  template <typename ...Args> void emplace_back(Args&&... args) {
+  template <typename... Args> void emplace_back(Args &&... args) {
     increase_capacity_if_full();
     new (data_ + size_++) T{std::forward<Args...>(args...)};
   }
 
-  template<typename T3>
-  T *insert(T3&& value, size_t pos) {
+  template <typename T3> T *insert(T3 &&value, size_t pos) {
     if (pos > size_) {
       return nullptr;
     }
@@ -124,7 +123,7 @@ public:
       delete[] data_;
       update_parameters(tmp, new_size, new_capacity);
     } else {
-      realloc(data_, data_ + new_size, capacity_);
+      release(data_ + new_size, data_ + size_);
     }
   }
 
@@ -152,7 +151,7 @@ private:
       return;
     }
     // Option 1: Copy with memcpy for POD types
-    if constexpr(std::is_trivially_copyable<T>::value) {
+    if constexpr (std::is_trivially_copyable<T>::value) {
       memcpy(dst, src_begin, sizeof(T) * LENGTH);
     }
     // Option 2: Copy with assignment operator for classes
@@ -164,7 +163,8 @@ private:
   }
 
   // Updates DATA_, SIZE_, and CAPACITY_ to new values
-  void update_parameters(T *new_data, size_t new_size, size_t new_capacity) noexcept {
+  void update_parameters(T *new_data, size_t new_size,
+                         size_t new_capacity) noexcept {
     data_ = new_data;
     size_ = new_size;
     capacity_ = new_capacity;
@@ -182,15 +182,30 @@ private:
   }
 
   // Initialize already allocated memory
-  void initialize(T *begin, T* end) {
+  void initialize(T *begin, T *end) {
     // Option 1: Initialize with memset for POD types
-    if constexpr(std::is_trivial<T>::value) {
+    if constexpr (std::is_trivial<T>::value) {
       memset(begin, 0, sizeof(T) * std::distance(begin, end));
     }
     // Option 2: Initialize with default constructor
     else {
       while (begin != end) {
         new (begin++) T{};
+      }
+    }
+  }
+
+  // Destroy vector elements
+  void release(T *begin, T *end) {
+    // Option 1: Reset values with memset for POD types
+    if constexpr (std::is_trivially_destructible<T>::value) {
+      memset(begin, 0, sizeof(T) * std::distance(begin, end));
+    }
+    // Option 2: Call destructors if vector elements are objects
+    else {
+      while (begin != end) {
+        begin->~T();
+        ++begin;
       }
     }
   }
@@ -205,7 +220,7 @@ private:
     }
   }
 
-  // Update vector with new data with optional shift in data
+  // Update vector with new data
   void realloc(T *begin, T *end, size_t CAPACITY) {
     T *tmp = new T[CAPACITY];
     copy(tmp, begin, end);
@@ -219,11 +234,13 @@ private:
     if (size_ == capacity_) {
       new_capacity = (capacity_ == 0 ? 1 : capacity_ * 2);
     }
-    custom_copy(data_ + index, data_ + index, index + 1, size_ + 1, new_capacity);
+    custom_copy(data_ + index, data_ + index, index + 1, size_ + 1,
+                new_capacity);
   }
 
   // Copy part of vector
-  void custom_copy(T *SKIP_START, T *SKIP_STOP, size_t CONTINUE_INDEX, size_t NEW_SIZE, size_t NEW_CAPACITY) {
+  void custom_copy(T *SKIP_START, T *SKIP_STOP, size_t CONTINUE_INDEX,
+                   size_t NEW_SIZE, size_t NEW_CAPACITY) {
     T *tmp = new T[NEW_CAPACITY];
     copy(tmp, data_, SKIP_START);
     copy(tmp + CONTINUE_INDEX, SKIP_STOP, data_ + size_);

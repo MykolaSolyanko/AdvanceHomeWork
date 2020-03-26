@@ -18,9 +18,9 @@ void show_vector(const Vector<Array>&vec) {
 void line(const char* s) {
     std::cout << "\n************ " << s << " ************\n";
 }
+
 int main() {  
     line("--------- DEMONSTRATE ARRAY CLASS WHICH WILL BE USED TO TEST VECTOR ---------");
-
     line("CREATE OBJECTS");
     //Default Constructor
     Array a1;   
