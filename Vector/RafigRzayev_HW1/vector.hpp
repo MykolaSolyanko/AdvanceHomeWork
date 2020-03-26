@@ -124,6 +124,7 @@ public:
       update_parameters(tmp, new_size, new_capacity);
     } else {
       release(data_ + new_size, data_ + size_);
+      size_ = new_size;
     }
   }
 
